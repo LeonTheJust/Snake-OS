@@ -6,6 +6,7 @@ pub struct Logger {
     serial: Serial,
 }
 
+#[derive(Clone, Copy)]
 pub enum LogLevel{
     Error,
     Warn,

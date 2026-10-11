@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
 
 mod framebuffer;
 mod serial;
@@ -8,6 +9,8 @@ mod interrups;
 
 use bootloader_api::{entry_point, BootInfo};
 use uart_16550::{Uart16550, backend::PioBackend};
+use core::sync::atomic::{AtomicBool, Ordering};
+use crate::interrups::InterruptHandler;
 use crate::logger::Logger;
 use crate::serial::Serial;
 
@@ -45,8 +48,18 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     let mut s = serial::Serial::new();
     let mut log = logger::Logger::new(s);
-    let level = logger::LogLevel::new(1);
-    Logger::log(&mut log,"Hello", level);
+    let mut level = logger::LogLevel::new(3);
+    interrups::init();
+
+    Logger::log(&mut log,"Before breakpoint", level);
+    x86_64::instructions::interrupts::int3();
+    Logger::log(&mut log, "After breakpoint", level);
+    let flag = &interrups::flag.load(Ordering::SeqCst);
+    if*(flag) {
+        Logger::log(&mut log, "It works\n", level);
+    }
+
+
 
     let _ = (width, height);
     framebuffer::clear(framebuffer);
