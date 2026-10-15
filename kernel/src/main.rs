@@ -6,6 +6,7 @@ mod framebuffer;
 mod serial;
 mod logger;
 mod interrups;
+mod gdt;
 
 use bootloader_api::{entry_point, BootInfo};
 use uart_16550::{Uart16550, backend::PioBackend};
@@ -49,15 +50,20 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let mut s = serial::Serial::new();
     let mut log = logger::Logger::new(s);
     let mut level = logger::LogLevel::new(3);
+    gdt::init();
     interrups::init();
 
-    Logger::log(&mut log,"Before breakpoint", level);
-    x86_64::instructions::interrupts::int3();
-    Logger::log(&mut log, "After breakpoint", level);
-    let flag = &interrups::flag.load(Ordering::SeqCst);
-    if*(flag) {
-        Logger::log(&mut log, "It works\n", level);
+    Logger::log(&mut log,"Before breakpoint\n", level);
+    if(interrups::flag2.load(Ordering::SeqCst)){
+        Logger::log(&mut log, "test2\n", level);
     }
+    if(interrups::flag.load(Ordering::SeqCst)){
+        Logger::log(&mut log, "test\n", level);
+    }
+    x86_64::instructions::interrupts::int3();
+    Logger::log(&mut log, "After breakpoint\n", level);
+
+
 
 
 

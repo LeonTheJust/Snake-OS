@@ -15,7 +15,9 @@ impl Serial {pub(crate) fn new() -> Self{
     pub(crate) fn write_message(&mut self, message: &str ) {
         self.uart.send_bytes_exact(message.as_bytes());
     }
+
 }
+
 
 
 
