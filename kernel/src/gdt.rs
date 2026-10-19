@@ -23,8 +23,8 @@ impl TSS{
     pub fn new() -> Self{
         let mut task_state_segment = TaskStateSegment::new();
         unsafe{ let mut temp_add = core::ptr::addr_of_mut!(STACK_BUFFER.bytes).cast::<u8>();
-                temp_add = temp_add.add(STACK_SIZE);
-                task_state_segment.interrupt_stack_table[0] = VirtAddr::from_ptr(temp_add);
+            temp_add = temp_add.add(STACK_SIZE);
+            task_state_segment.interrupt_stack_table[0] = VirtAddr::from_ptr(temp_add);
         }
 
 
@@ -51,6 +51,7 @@ pub struct GDT{
     tss_selector : SegmentSelector,
     code_selector : SegmentSelector,
     data_selector : SegmentSelector,
+
 }
 
 impl GDT{

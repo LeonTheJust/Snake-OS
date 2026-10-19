@@ -5,13 +5,14 @@
 mod framebuffer;
 mod serial;
 mod logger;
-mod interrups;
+mod interrupts;
 mod gdt;
 
 use bootloader_api::{entry_point, BootInfo};
 use uart_16550::{Uart16550, backend::PioBackend};
 use core::sync::atomic::{AtomicBool, Ordering};
-use crate::interrups::InterruptHandler;
+use core::sync::atomic::Ordering::Relaxed;
+use crate::interrupts::InterruptHandler;
 use crate::logger::Logger;
 use crate::serial::Serial;
 
@@ -51,26 +52,44 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let mut log = logger::Logger::new(s);
     let mut level = logger::LogLevel::new(3);
     gdt::init();
-    interrups::init();
+    interrupts::init();
 
     Logger::log(&mut log,"Before breakpoint\n", level);
-    if(interrups::flag2.load(Ordering::SeqCst)){
+    if(interrupts::flag2.load(Ordering::SeqCst)){
         Logger::log(&mut log, "test2\n", level);
     }
-    if(interrups::flag.load(Ordering::SeqCst)){
+    if(interrupts::flag.load(Ordering::SeqCst)){
         Logger::log(&mut log, "test\n", level);
     }
-    x86_64::instructions::interrupts::int3();
+    //x86_64::instructions::interrupts::int3();
     Logger::log(&mut log, "After breakpoint\n", level);
 
+    let test_address = 0x1000usize;
+
+    let mut buffer = [0u8;20];
+
+    Logger::log(&mut log, serial::u64_to_str(interrupts::tick_counter.load(Relaxed), &mut buffer), level);
+
+    /*unsafe {
+        core::arch::asm!(
+        "mov {value}, qword ptr [{address}]",
+        address = in(reg) test_address,
+        value = lateout(reg) _,
+        options(readonly, nostack, preserves_flags),
+        );
+    }*/
 
 
 
 
     let _ = (width, height);
     framebuffer::clear(framebuffer);
+
     loop {
         core::hint::spin_loop();
+        //Logger::log(&mut log, serial::u64_to_str(interrupts::tick_counter.load(Relaxed), &mut buffer), level);
+        Logger::log(&mut log, serial::u64_to_str(interrupts::KEYBOARD.load(Relaxed) as u64, &mut buffer), level);
+        x86_64::instructions::hlt();
     }
 }
 
