@@ -7,14 +7,18 @@ mod serial;
 mod logger;
 mod interrupts;
 mod gdt;
+mod memory;
 
 use bootloader_api::{entry_point, BootInfo};
 use uart_16550::{Uart16550, backend::PioBackend};
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::sync::atomic::Ordering::Relaxed;
+use bootloader_api::info::MemoryRegionKind;
+use x86_64::structures::paging::FrameAllocator;
 use crate::interrupts::InterruptHandler;
 use crate::logger::Logger;
-use crate::serial::Serial;
+use crate::memory::MemoryAllocator;
+use crate::serial::{emergency_message, u64_to_str, Serial};
 
 entry_point!(kernel_main);
 
@@ -51,6 +55,8 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let mut s = serial::Serial::new();
     let mut log = logger::Logger::new(s);
     let mut level = logger::LogLevel::new(3);
+    let mut level2 = logger::LogLevel::new(2);
+    let mut level1 = logger::LogLevel::new(1);
     gdt::init();
     interrupts::init();
 
@@ -78,17 +84,28 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         options(readonly, nostack, preserves_flags),
         );
     }*/
-
-
-
+    let mut sum = 0;
+    let region = &boot_info.memory_regions;
+    for region in boot_info.memory_regions.iter() {
+        // region is a &MemoryRegion
+        let start = region.start;
+        let end = region.end;
+        let kind = region.kind;
+        if(region.kind == MemoryRegionKind::Usable){
+            sum = sum + end - start;
+        }
+    }
+    Logger::log(&mut log, u64_to_str(sum, &mut buffer), level);
 
     let _ = (width, height);
     framebuffer::clear(framebuffer);
 
+    let mut mem = MemoryAllocator::new(region);
+
     loop {
         core::hint::spin_loop();
         //Logger::log(&mut log, serial::u64_to_str(interrupts::tick_counter.load(Relaxed), &mut buffer), level);
-        Logger::log(&mut log, serial::u64_to_str(interrupts::KEYBOARD.load(Relaxed) as u64, &mut buffer), level);
+        //Logger::log(&mut log, serial::u64_to_str(interrupts::KEYBOARD.load(Relaxed) as u64, &mut buffer), level);
         x86_64::instructions::hlt();
     }
 }
