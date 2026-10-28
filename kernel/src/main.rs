@@ -9,20 +9,33 @@ mod interrupts;
 mod gdt;
 mod memory;
 
-use bootloader_api::{entry_point, BootInfo};
+use x86_64::structures::paging::Page;
+use bootloader_api::{entry_point, BootInfo, BootloaderConfig};
 use uart_16550::{Uart16550, backend::PioBackend};
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::sync::atomic::Ordering::Relaxed;
+use bootloader_api::config::Mapping;
 use bootloader_api::info::MemoryRegionKind;
-use x86_64::structures::paging::FrameAllocator;
+use x86_64::registers::control::Cr3;
+use x86_64::structures::paging::{FrameAllocator, PageTable, Size4KiB, Translate};
+use x86_64::VirtAddr;
 use crate::interrupts::InterruptHandler;
 use crate::logger::Logger;
-use crate::memory::MemoryAllocator;
+use crate::memory::{init_level_4_table, MemoryAllocator};
 use crate::serial::{emergency_message, u64_to_str, Serial};
 
-entry_point!(kernel_main);
+pub const BOOTLOADER_CONFIG: BootloaderConfig = {
+    let mut config = BootloaderConfig::new_default();
+    config.mappings.physical_memory = Some(Mapping::Dynamic);
+    config
+};
+
+entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
+    let config = BootloaderConfig::new_default();
+
+
     let framebuffer = boot_info.framebuffer.as_mut().unwrap();
 
     let info = framebuffer.info();
@@ -100,7 +113,35 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let _ = (width, height);
     framebuffer::clear(framebuffer);
 
-    let mut mem = MemoryAllocator::new(region);
+    let mut memory = MemoryAllocator::new(region);
+
+    let Some(offset) = boot_info.physical_memory_offset.into_option() else { panic!("Physical memory offset is not valid") };
+
+    unsafe {
+        let mut offset_page_table = memory::init_level_4_table(VirtAddr::new(offset));
+
+        emergency_message("\n");
+        let (level_4_frame, _) = Cr3::read();
+
+        let physical_address = level_4_frame.start_address();
+        let virtual_address = VirtAddr::new(0x4444_4444_0000);
+        let virtual_page = Page::<Size4KiB>::containing_address(virtual_address);
+        memory::map_multiple_pages(1,&mut offset_page_table,&mut memory, virtual_page);
+        let v :*mut u64 = virtual_address.as_mut_ptr();
+        v.write_volatile(12345);
+        let temp2 = offset_page_table.translate_addr(virtual_page.start_address());
+        match temp2 {
+            Some(temp3) => {
+                emergency_message("Some(");
+                let value = v.read_volatile();
+                emergency_message(u64_to_str(temp3.as_u64(), &mut buffer),);
+                emergency_message(")\n");
+            }
+            None =>{
+                emergency_message("None");
+            }
+        }
+    }
 
     loop {
         core::hint::spin_loop();
