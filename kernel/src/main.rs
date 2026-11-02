@@ -8,17 +8,20 @@ mod logger;
 mod interrupts;
 mod gdt;
 mod memory;
+mod heap;
 
+use core::alloc::{GlobalAlloc, Layout};
 use x86_64::structures::paging::Page;
 use bootloader_api::{entry_point, BootInfo, BootloaderConfig};
 use uart_16550::{Uart16550, backend::PioBackend};
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::sync::atomic::Ordering::Relaxed;
 use bootloader_api::config::Mapping;
-use bootloader_api::info::MemoryRegionKind;
+use bootloader_api::info::{MemoryRegion, MemoryRegionKind};
 use x86_64::registers::control::Cr3;
 use x86_64::structures::paging::{FrameAllocator, PageTable, Size4KiB, Translate};
 use x86_64::VirtAddr;
+use crate::heap::{BumpAllocator, ALLOCATOR};
 use crate::interrupts::InterruptHandler;
 use crate::logger::Logger;
 use crate::memory::{init_level_4_table, MemoryAllocator};
@@ -119,29 +122,16 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     unsafe {
         let mut offset_page_table = memory::init_level_4_table(VirtAddr::new(offset));
+        let virtual_addr = VirtAddr::new(0x4444_4444_0000);
+        let page = Page::<Size4KiB>::containing_address(virtual_addr);
+        let bump_first_page = memory::map_multiple_pages(16, &mut offset_page_table, &mut memory, page);
+        let layout = Layout::new::<u64>();
+        heap::ALLOCATOR.set_bump_allocator(bump_first_page.start_address().as_u64() as usize, bump_first_page.start_address().as_u64() as usize + (16 * 4096));
+        let res = ALLOCATOR.alloc(layout);
+        Logger::log(&mut log, "alllllllll goooooodddd" , level);
 
-        emergency_message("\n");
-        let (level_4_frame, _) = Cr3::read();
-
-        let physical_address = level_4_frame.start_address();
-        let virtual_address = VirtAddr::new(0x4444_4444_0000);
-        let virtual_page = Page::<Size4KiB>::containing_address(virtual_address);
-        memory::map_multiple_pages(1,&mut offset_page_table,&mut memory, virtual_page);
-        let v :*mut u64 = virtual_address.as_mut_ptr();
-        v.write_volatile(12345);
-        let temp2 = offset_page_table.translate_addr(virtual_page.start_address());
-        match temp2 {
-            Some(temp3) => {
-                emergency_message("Some(");
-                let value = v.read_volatile();
-                emergency_message(u64_to_str(temp3.as_u64(), &mut buffer),);
-                emergency_message(")\n");
-            }
-            None =>{
-                emergency_message("None");
-            }
-        }
     }
+
 
     loop {
         core::hint::spin_loop();

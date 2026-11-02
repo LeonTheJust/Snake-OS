@@ -95,7 +95,7 @@ pub fn find_free_range(number_of_pages :u64, offset_page_table:&mut OffsetPageTa
     let new_page = Page::<Size4KiB>::containing_address(VirtAddr::new(page.start_address().as_u64() - count * 4096));
     return Some(new_page);
 }
-pub unsafe fn map_multiple_pages(number_of_pages : u64, offset_page_table: &mut OffsetPageTable, memory_allocator : &mut MemoryAllocator, virtual_page : Page<Size4KiB>) {
+pub unsafe fn map_multiple_pages(number_of_pages : u64, offset_page_table: &mut OffsetPageTable, memory_allocator : &mut MemoryAllocator, virtual_page : Page<Size4KiB>) -> Page<Size4KiB> {
     let first_page_opt = find_free_range(number_of_pages, offset_page_table, virtual_page);
     if(first_page_opt == None) {
         panic!("Failed to map multiple pages, not enough pages found!")
@@ -107,6 +107,7 @@ pub unsafe fn map_multiple_pages(number_of_pages : u64, offset_page_table: &mut 
             first_page = Page::<Size4KiB>::containing_address(first_page.start_address() + 4096);
         }
     }
+    return first_page_opt.unwrap();
 }
 
 unsafe impl FrameAllocator<Size4KiB> for MemoryAllocator<'_> {
