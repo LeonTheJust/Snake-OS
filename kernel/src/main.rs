@@ -33,6 +33,7 @@ use crate::serial::{emergency_message, u64_to_str, Serial};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use crate::keyboard::{ KEYBOARD_QUEUE};
+use crate::terminal::COMMAND_PARSER;
 
 pub const BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -152,20 +153,38 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
 
 
-    KEYBOARD_QUEUE.lock().push(0x12);
+    //KEYBOARD_QUEUE.lock().push(0x12);
+
     loop {
         core::hint::spin_loop();
         //Logger::log(&mut log, serial::u64_to_str(interrupts::tick_counter.load(Relaxed), &mut buffer), level);
         //Logger::log(&mut log, serial::u64_to_str(interrupts::KEYBOARD.load(Relaxed) as u64, &mut buffer), level);
-        /*let mut q = KEYBOARD_QUEUE.lock();
-        let temp = q.pop();
-        if ! temp.is_none() {
-            if temp.unwrap() < 100 {
-                let mut tmp = [0u8; 4];
-                Logger::log(&mut log, (q.decode(temp.unwrap()).unwrap()).encode_utf8(&mut tmp), level2);
+        x86_64::instructions::interrupts::without_interrupts(||{let mut q = KEYBOARD_QUEUE.lock();
+            let temp = q.pop();
+            if ! temp.is_none() {
+                if temp.unwrap() < 100 {
+                    let mut tmp = [0u8; 4];
+                    let c = q.decode(temp.unwrap()).unwrap();
+                    drop(q);
+                    let mut t = COMMAND_PARSER.lock();
+                    if temp.unwrap() == 0x1C{
+                        t.lex();
+                        t.command_buffer.flush();
+                    }
+                    else if temp.unwrap() == 0x0E{
+                        t.command_buffer.delete();
+                    }
+                    else{t.command_buffer.push(c);}
+                    drop(t);
+                }
+                else{
+                    drop(q);
+                }
             }
-        }
-        drop(q);*/
+            else{
+                drop(q);
+            }});
+
         x86_64::instructions::hlt();
     }
 }
