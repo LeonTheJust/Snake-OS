@@ -9,9 +9,9 @@ use spin::Once;
 use uart_16550::{Config, Uart16550};
 use x86_64::addr::VirtAddrNotValid;
 use x86_64::VirtAddr;
-use crate::serial;
+use crate::{keyboard, serial};
 use x86_64::instructions::port::PortReadOnly;
-use crate::serial::u64_to_str;
+use crate::serial::{emergency_message, u64_to_str};
 
 pub struct InterruptHandler{
     interrupt_table : InterruptDescriptorTable,
@@ -109,6 +109,9 @@ pub (crate) static KEYBOARD: AtomicU8 = AtomicU8::new(0);
 extern "x86-interrupt" fn keyboard_handler(stack_frame: InterruptStackFrame) {
     let mut port = PortReadOnly::<u8>::new(0x60);
     let scancode = unsafe { port.read() };
-    KEYBOARD.store(scancode, Ordering::Relaxed);
+    keyboard::KEYBOARD_QUEUE.lock().push(scancode);
+    //keyboard::KEYBOARD_QUEUE.force_unlock();
+    //emergency_message("Pushed keyboard input");
+    //KEYBOARD.store(scancode, Ordering::Relaxed);
     unsafe{PICS.lock().notify_end_of_interrupt(33);}
 }

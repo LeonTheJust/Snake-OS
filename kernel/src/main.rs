@@ -9,6 +9,10 @@ mod interrupts;
 mod gdt;
 mod memory;
 mod heap;
+mod keyboard;
+mod terminal;
+
+extern crate alloc;
 
 use core::alloc::{GlobalAlloc, Layout};
 use x86_64::structures::paging::Page;
@@ -26,6 +30,9 @@ use crate::interrupts::InterruptHandler;
 use crate::logger::Logger;
 use crate::memory::{init_level_4_table, MemoryAllocator};
 use crate::serial::{emergency_message, u64_to_str, Serial};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use crate::keyboard::{ KEYBOARD_QUEUE};
 
 pub const BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -129,14 +136,36 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         heap::ALLOCATOR.set_bump_allocator(bump_first_page.start_address().as_u64() as usize, bump_first_page.start_address().as_u64() as usize + (16 * 4096));
         let res = ALLOCATOR.alloc(layout);
         Logger::log(&mut log, "alllllllll goooooodddd" , level);
-
     }
 
+    //keyboard_queue.push(0);
+    /*for i in 1..100 {
+        keyboard_queue.push(i as u8);
+        emergency_message(u64_to_str(keyboard_queue.pop().unwrap() as u64, &mut buffer));
+        emergency_message(" ");
+        emergency_message(u64_to_str(i, &mut buffer));
+        emergency_message("\n");
+    }
+    emergency_message(u64_to_str(keyboard_queue.pop().unwrap() as u64, &mut buffer));
+    emergency_message(u64_to_str(keyboard_queue.pop().unwrap() as u64, &mut buffer));
+    emergency_message(u64_to_str(keyboard_queue.pop().unwrap() as u64, &mut buffer));*/
 
+
+
+    KEYBOARD_QUEUE.lock().push(0x12);
     loop {
         core::hint::spin_loop();
         //Logger::log(&mut log, serial::u64_to_str(interrupts::tick_counter.load(Relaxed), &mut buffer), level);
         //Logger::log(&mut log, serial::u64_to_str(interrupts::KEYBOARD.load(Relaxed) as u64, &mut buffer), level);
+        /*let mut q = KEYBOARD_QUEUE.lock();
+        let temp = q.pop();
+        if ! temp.is_none() {
+            if temp.unwrap() < 100 {
+                let mut tmp = [0u8; 4];
+                Logger::log(&mut log, (q.decode(temp.unwrap()).unwrap()).encode_utf8(&mut tmp), level2);
+            }
+        }
+        drop(q);*/
         x86_64::instructions::hlt();
     }
 }

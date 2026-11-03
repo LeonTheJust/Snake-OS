@@ -68,6 +68,7 @@ impl Logger {
             Serial::write_message(&mut self.serial, "\x1b[0m");
         }
         Serial::write_message(&mut self.serial, message);
+        Serial::write_message(&mut self.serial, "\n");
     }
 }
 
