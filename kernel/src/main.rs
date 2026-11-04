@@ -170,7 +170,9 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     drop(q);
                     let mut t = COMMAND_PARSER.lock();
                     if temp.unwrap() == 0x1C{
-                        t.lex();
+                        y = y + 8;
+                        x = 0;
+                        t.lex(x,y,framebuffer);
                         t.command_buffer.flush();
                         y = y + 8;
                         x = 0;
@@ -179,7 +181,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                         t.command_buffer.delete();
                     }
                     else{t.command_buffer.push(c);
-                    text_render::draw_character(framebuffer,y,x,c)}
+                    text_render::draw_character(framebuffer, y as usize, x as usize, c)}
                     x = x + 8;
                     drop(t);
                 }

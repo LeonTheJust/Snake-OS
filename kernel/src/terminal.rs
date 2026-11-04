@@ -1,6 +1,8 @@
 use alloc::string::{String, ToString};
+use bootloader_api::info::FrameBuffer;
 use spin::Mutex;
 use crate::serial::emergency_message;
+use crate::text_render;
 
 pub struct CommandBuffer{
     command : [char; 128],
@@ -65,24 +67,24 @@ impl CommandParser{
         return false;
     }
 
-    pub fn lex(&mut self){
+    pub fn lex(&mut self, x: i32, y: i32, frame_buffer: &mut FrameBuffer){
         let str = self.command_buffer.current_command();
         let temp  = str.split_once(' ');
         if temp.is_some(){
             let (command, arguments) = temp.unwrap();
             if command == "help"{
-                Terminal::help();
+                Terminal::help(frame_buffer,x,y);
             }
             else if command == "say"{
-                Terminal::say(arguments.parse().unwrap());
+                Terminal::say(frame_buffer,x,y ,arguments.parse().unwrap());
             }
             else{
-                Terminal::wrong_command(command.parse().unwrap());
+                Terminal::wrong_command(frame_buffer,x,y ,command.parse().unwrap());
             }
         }
         else{
             if(str == "help"){
-                Terminal::help();
+                Terminal::help(frame_buffer,x,y);
             }
         }
     }
@@ -96,22 +98,39 @@ pub struct Terminal{
 impl Terminal{
     pub const fn new() -> Terminal {return Terminal{}}
 
-    pub fn help(){
-        emergency_message("SnakeOS help:\n");
-        emergency_message("Commands:\n");
-        emergency_message("help (this command): displays commands\n");
-        emergency_message("say (in double quo marks) message: displays a message\n");
+    pub fn help(frame_buffer:&mut FrameBuffer, mut x:i32, y :i32){
+        let str = "SnakeOS help:\nSnakeOS help:\nhelp (this command): displays commands\nsay (in double quo marks) message: displays a message\n";
+        emergency_message(str);
+        for char in str.chars(){
+            text_render::draw_character(frame_buffer,y as usize, x as usize, char);
+            x = x + 8;
+        }
     }
 
-    pub fn say(message:String){
+    pub fn say(frame_buffer:&mut FrameBuffer, mut x:i32, y :i32, message:String){
         emergency_message(&*message);
         emergency_message("\n");
+        for char in message.chars(){
+            text_render::draw_character(frame_buffer,y as usize, x as usize, char);
+            x = x + 8;
+        }
+        text_render::draw_character(frame_buffer,y as usize, x as usize, '\n');
+
     }
 
-    pub fn wrong_command(command:String){
+    pub fn wrong_command(frame_buffer:&mut FrameBuffer, mut x:i32, y :i32, command:String){
         emergency_message("Wrong command:");
         emergency_message(command.as_str());
         emergency_message("\n");
+        for chat in "Wrong command:".chars(){
+            text_render::draw_character(frame_buffer,y as usize, x as usize, chat);
+            x = x + 8;
+        }
+        for char in command.chars(){
+            text_render::draw_character(frame_buffer,y as usize, x as usize, char);
+            x = x + 8;
+        }
+        text_render::draw_character(frame_buffer,y as usize, x as usize, '\n');
     }
 }
 
