@@ -11,6 +11,7 @@ mod memory;
 mod heap;
 mod keyboard;
 mod terminal;
+mod text_render;
 
 extern crate alloc;
 
@@ -154,7 +155,8 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
 
     //KEYBOARD_QUEUE.lock().push(0x12);
-
+    let mut x = 0;
+    let mut y = 0;
     loop {
         core::hint::spin_loop();
         //Logger::log(&mut log, serial::u64_to_str(interrupts::tick_counter.load(Relaxed), &mut buffer), level);
@@ -170,11 +172,15 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     if temp.unwrap() == 0x1C{
                         t.lex();
                         t.command_buffer.flush();
+                        y = y + 8;
+                        x = 0;
                     }
                     else if temp.unwrap() == 0x0E{
                         t.command_buffer.delete();
                     }
-                    else{t.command_buffer.push(c);}
+                    else{t.command_buffer.push(c);
+                    text_render::draw_character(framebuffer,y,x,c)}
+                    x = x + 8;
                     drop(t);
                 }
                 else{
