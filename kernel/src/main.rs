@@ -12,13 +12,15 @@ mod heap;
 mod keyboard;
 mod terminal;
 mod text_render;
+mod file;
+mod file_system;
 
 extern crate alloc;
 
 use core::alloc::{GlobalAlloc, Layout};
 use x86_64::structures::paging::Page;
 use bootloader_api::{entry_point, BootInfo, BootloaderConfig};
-use uart_16550::{Uart16550, backend::PioBackend};
+use uart_16550::{backend::PioBackend, Uart16550};
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::sync::atomic::Ordering::Relaxed;
 use bootloader_api::config::Mapping;
@@ -33,7 +35,7 @@ use crate::memory::{init_level_4_table, MemoryAllocator};
 use crate::serial::{emergency_message, u64_to_str, Serial};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use crate::keyboard::{ KEYBOARD_QUEUE};
+use crate::keyboard::KEYBOARD_QUEUE;
 use crate::terminal::COMMAND_PARSER;
 
 pub const BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -170,19 +172,23 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
                     drop(q);
                     let mut t = COMMAND_PARSER.lock();
                     if temp.unwrap() == 0x1C{
-                        y = y + 8;
+                        y = y + 8 * text_render::scale;
                         x = 0;
                         t.lex(x,y,framebuffer);
                         t.command_buffer.flush();
-                        y = y + 8;
+                        y = y + 8 * text_render::scale;
                         x = 0;
                     }
                     else if temp.unwrap() == 0x0E{
                         t.command_buffer.delete();
+                        x = x - 8 * text_render::scale;
+                        let space = ' ';
+                        text_render::delete_character(framebuffer,y as usize ,x as usize);
+                        x = x - 8 * text_render::scale;
                     }
                     else{t.command_buffer.push(c);
                     text_render::draw_character(framebuffer, y as usize, x as usize, c)}
-                    x = x + 8;
+                    x = x + 8 * text_render::scale;
                     drop(t);
                 }
                 else{
